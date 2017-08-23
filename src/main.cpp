@@ -1,20 +1,40 @@
 #include <Arduino.h>
 
 
+//--------------- MUSIC + bara SD kort ------------------
+#include <SimpleSDAudio.h>
+
+// Create static buffer
+ //#define BIGBUFSIZE (2*512)      // bigger than 2*512 is often only possible on Arduino megas!
+ //uint8_t bigbuf[BIGBUFSIZE];
+
+
+
+//     SdPlay.worker();  // You can remove this line if you like - worker is not necessary
+//-------------------------------
+
+
+/*
 // -----tft-------------
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7735.h>
 #include <SPI.h>
 
 #define TFT_CS     10
-#define TFT_RST    9
-#define TFT_DC     8
+#define TFT_RST    9 //9
+#define TFT_DC     8 // 8
+
+
+#define SD_CS    4  // Chip select line for SD card
+
 
 #define TFT_SCLK 13
 #define TFT_MOSI 11 //brukade vara på pin 11..men ska nu ha den för musik...
 
 Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS,  TFT_DC, TFT_RST);
   //------------
+*/
+
 
 //--------- Buttons A1 ------------
 #include <OnewireKeypad.h>
@@ -48,6 +68,7 @@ enum  direction { FORWARD, REVERSE };
 int disco_efx = 0;
 int cops_efx = 0;
 int headlight_efx = 0;
+
 
 
 // NeoPattern Class - derived from the Adafruit_NeoPixel class
@@ -177,6 +198,7 @@ class NeoPatterns : public Adafruit_NeoPixel
         Increment();
     }
 
+
     // Initialize for a Theater Chase
     void TheaterChase(uint32_t color1, uint32_t color2, uint8_t interval, direction dir = FORWARD)
     {
@@ -215,28 +237,27 @@ class NeoPatterns : public Adafruit_NeoPixel
 
   //  void SirenEffect(uint32_t color1,uint32_t color2, uint8_t interval, int blinkers  -> 0 INGEN 1 VÄNSTER 2 HÖGER..TYP..
 
-    void SirenEffect(uint32_t color1,uint32_t color2, uint8_t interval)
+    void SirenEffect(uint32_t color1,uint32_t color2,uint32_t color3, long interval,uint16_t steps)
     {
         ActivePattern = SIREN_EFFECT;
         Interval = interval;
-        TotalSteps = 12; //hur många ggr vill man köra denna effet...
+        TotalSteps = steps; //hur många ggr vill man köra denna effet...
         Color1 = color1;
         Color2 = color2;
+        Color3 = color3;
         Index = 0;
    }
 
     // Update the Theater Chase Pattern
     void SirenEffectUpdate()
     {
-     uint32_t black = Color(0, 0, 0);
-
       if (Index % 2 == 0)
       {
         int off= 15;
         for (int on=0; on < 15; on++)
         {
-         setPixelColor(on, Color1); // RED
-         setPixelColor(off, black);
+         setPixelColor(on,  Color1); // RED
+         setPixelColor(off, Color3); //black usually
          off++;
         }
         show();
@@ -247,8 +268,8 @@ class NeoPatterns : public Adafruit_NeoPixel
 
         for (int on=15; on<30; on++)
         {
-             setPixelColor(on, Color2); // blue...
-             setPixelColor(off, black);
+             setPixelColor(on,  Color2); // blue...
+             setPixelColor(off, Color3);
              off++;
         }
         show();
@@ -257,25 +278,33 @@ class NeoPatterns : public Adafruit_NeoPixel
       Increment();
     }
 
-    void SirenEffect2(uint32_t color1,uint32_t color2, uint8_t interval)
+    void SirenEffect2(uint32_t color1,uint32_t color2, long interval,uint16_t steps)
     {
-        ActivePattern = SIREN_EFFECT;
+        ActivePattern = SIREN_EFFECT2;
         Interval = interval;
-        TotalSteps = 12; //hur många ggr vill man köra denna effet...
+        TotalSteps = steps; //hur många ggr vill man köra denna effet...
         Color1 = color1;
         Color2 = color2;
         Index = 0;
-   }
+     }
 
     // Update the Theater Chase Pattern
     void SirenEffectUpdate2()
     {
-     uint32_t black = Color(0, 0, 0);
+      uint32_t black = Color(0, 0, 0);
 
       if (Index % 2 == 0)
       {
-        int off= 15;
-        for (int on=0; on < 15; on++)
+        int off= 8;
+        for (int on=0; on < 8; on++)
+        {
+         setPixelColor(on, Color1); // RED
+         setPixelColor(off, black);
+         off++;
+        }
+
+        off= 23;
+        for (int on=15; on < 23; on++)
         {
          setPixelColor(on, Color1); // RED
          setPixelColor(off, black);
@@ -285,14 +314,22 @@ class NeoPatterns : public Adafruit_NeoPixel
       }
       else
       {
-        int off=0;
-
-        for (int on=15; on<30; on++)
+        int off= 8;
+        for (int on=0; on < 8; on++)
         {
-             setPixelColor(on, Color2); // blue...
-             setPixelColor(off, black);
-             off++;
+         setPixelColor(on, black); // RED
+         setPixelColor(off, Color2);
+         off++;
         }
+
+        off= 23;
+        for (int on=15; on < 23; on++)
+        {
+         setPixelColor(on, black); // RED
+         setPixelColor(off, Color2);
+         off++;
+        }
+
         show();
       }
 
@@ -457,6 +494,18 @@ void doit1()
 {
   disco_efx++;
 
+      Serial.print(F("Looking for EXAMPLE.AFM... "));
+      if(!SdPlay.setFile("MUS1.BFM")) {
+        Serial.println(F(" not found on card! Error code: "));
+        Serial.println(SdPlay.getLastError());
+        while(1);
+      } else {
+       Serial.println(F("found."));
+      }
+
+      Serial.print(F("Playing...KRS "));
+      SdPlay.play();
+
   if (disco_efx == 1)
   {
     Stick.Scanner(Stick.Wheel(random(255)), 55);
@@ -483,29 +532,71 @@ void doit2()
 {
 
 }
-void doit3()
-{
 
-
-}
 // turn LEDS OFF
 void doitA()
 {
   Stick.ColorWipe(Stick.Color(0,0,0), 0);
 // funkar inte så att säga-> fryser alla leds då..  Stick.ActivePattern = NONE; // vad gör den...? behövs?
 }
+
+void doit3()
+{
+    doitA(); // led strip off
+    Stick.ActivePattern = NONE;  // ska inte kalla på en funktion update hela tiden..slöar ner musiken...
+
+        Serial.print(F("Looking for jazz musik.... "));
+      if(!SdPlay.setFile("CALM1.BFM")) {
+        Serial.println(F(" not found on card! Error code: "));
+        Serial.println(SdPlay.getLastError());
+        while(1);
+      } else {
+       Serial.println(F("found."));
+      }
+
+      Serial.print(F("Playing...jazz musik "));
+      SdPlay.play();
+
+
+}
+
 // police effect..several effects combined..
 void doit4()
 {
 
+      Serial.print(F("Looking for krs.AFM... "));
+      if(!SdPlay.setFile("KRS.BFM")) {
+        Serial.println(F(" not found on card! Error code: "));
+        Serial.println(SdPlay.getLastError());
+        while(1);
+      } else {
+       Serial.println(F("found."));
+      }
+
+      Serial.print(F("Playing...KRS "));
+      SdPlay.play();
+
 //https://www.tindie.com/products/PhoenixCNC/neopixel-police-light-pcb-with-atmega328/
    cops_efx++;
-   Stick.SirenEffect(Stick.Color(255,0,0),Stick.Color(0,0,255), 1000);
 
+   Stick.SirenEffect2(Stick.Color(255,0,0),Stick.Color(0,0,255), 300,20);
 }
 // Head Light ..in tree leves.. full medium light...4 now.
 void doit5()
 {
+      Serial.print(F("Looking for EXAMPLE.AFM... "));
+      if(!SdPlay.setFile("HLIGHT.BFM")) {
+        Serial.println(F(" not found on card! Error code: "));
+        Serial.println(SdPlay.getLastError());
+        while(1);
+      } else {
+       Serial.println(F("found."));
+      }
+
+      Serial.print(F("Playing...HLIGHT "));
+      SdPlay.play();
+
+
   headlight_efx++;
 
   if (headlight_efx == 1)
@@ -526,12 +617,36 @@ void doit5()
 // blinka HÖGER
 void doit6()
 {
-     Stick.SirenEffect(Stick.Color(255,64,0),Stick.Color(0,0,0), 1000);
+      Serial.print(F("Looking for EXAMPLE.AFM... "));
+      if(!SdPlay.setFile("BLINK2.BFM")) {
+        Serial.println(F(" not found on card! Error code: "));
+        Serial.println(SdPlay.getLastError());
+        while(1);
+      } else {
+       Serial.println(F("found."));
+      }
+
+      Serial.print(F("Playing...KRS "));
+      SdPlay.play();
+
+     Stick.SirenEffect(Stick.Color(255,64,0),Stick.Color(0,0,0),Stick.Color(0,0,0), 400,12);
 }
 // blinka VÄNSTER
 void doitB()
 {
-   Stick.SirenEffect(Stick.Color(0,0,0),Stick.Color(255,64,0), 1000);
+      Serial.print(F("Looking for EXAMPLE.AFM... "));
+      if(!SdPlay.setFile("BLINK2.BFM")) {
+        Serial.println(F(" not found on card! Error code: "));
+        Serial.println(SdPlay.getLastError());
+        while(1);
+      } else {
+       Serial.println(F("found."));
+      }
+
+      Serial.print(F("Playing...KRS "));
+      SdPlay.play();
+
+   Stick.SirenEffect(Stick.Color(0,0,0),Stick.Color(255,64,0),Stick.Color(0,0,0), 380,12);
 }
 
 // Stick Completion Callback
@@ -540,44 +655,39 @@ void StickComplete()
 
     Serial.println("stick complete called...."); // detta kallas när ljusgrejjen är klar..
 
-
     //  if cops -> run...
     if (cops_efx == 1)
     {
-         Serial.println("cops = 1 ..red scan!");
-         Stick.Scanner(Stick.Color(255, 0, 0), 7); // red....
-
+         Serial.println("colorwipe..red");
+         Stick.ColorWipe(Stick.Color(255, 0, 0), 20);
          cops_efx++;
     }
     else if (cops_efx == 2)
     {
-         Serial.println("cops = 2 ..blue scan!");
 
-         Stick.Scanner(Stick.Color(0, 0, 255), 7); // blue....
-
-         cops_efx++;
-    }
-    else if (cops_efx == 3)
-    {
-         Serial.println("colorwipe..red");
-         Stick.ColorWipe(Stick.Color(255, 0, 0), 20);
-
-         cops_efx++;
-    }
-    else if (cops_efx == 4)
-    {
       Serial.println("colorwipe..REVERSE blue");
     //  Stick.Reverse();
       Stick.ColorWipe(Stick.Color(0, 0, 255), 20);
 
          cops_efx++;
     }
+    else if (cops_efx == 3)
+    {
+      Serial.println("first cop efx again...");
+      Stick.SirenEffect2(Stick.Color(255,0,0),Stick.Color(0,0,255), 100,40);
+      cops_efx++;
+    }
+    else if (cops_efx == 4)
+    {
+      Serial.println("first cop efx again...");
+      Stick.SirenEffect(Stick.Color(255,0,0),Stick.Color(0,0,255),Stick.Color(0,0,0), 300,20);
+      cops_efx++;
+    }
     // sista effekten bör vara samma som första....så de blir en slinga...
     else if (cops_efx == 5)
     {
       Serial.println("first cop efx again...");
-      Stick.SirenEffect(Stick.Color(255,0,0),Stick.Color(0,0,255), 1000);
-
+      Stick.SirenEffect2(Stick.Color(255,0,0),Stick.Color(0,0,255), 300,20);
       cops_efx = 1; // goto first efx again...suckkkk
     }
 }
@@ -586,10 +696,26 @@ void StickComplete()
 
 
 
-void setup(void) {
+void setup() {
     Serial.begin(9600);
 
+       // Setting the buffer manually for more flexibility
+       // SdPlay.setWorkBuffer(bigbuf, BIGBUFSIZE);
+        //SdPlay.worker();  // You can remove this line if you like - worker is not necessary
 
+    if (!SdPlay.init(SSDA_MODE_FULLRATE | SSDA_MODE_STEREO | SSDA_MODE_AUTOWORKER)) {
+        Serial.println(F("initialization failed. Things to check:"));
+        Serial.println(F("* is a card is inserted?"));
+        Serial.println(F("* Is your wiring correct?"));
+        Serial.println(F("* maybe you need to change the chipSelect pin to match your shield or module?"));
+        Serial.print(F("Error code: "));
+        Serial.println(SdPlay.getLastError());
+        while(1);
+      } else {
+       Serial.println(F("Wiring is correct and a card is present."));
+      }
+
+/*  TFT
   tft.initR(INITR_BLACKTAB);  // You will need to do this in every sketch
   tft.fillScreen(ST7735_BLACK);
 
@@ -611,19 +737,10 @@ void setup(void) {
 
   tft.setCursor(10,50);
   tft.println("4) STOP LEDS");
-
-
-
-
-
+*/
 
     KP.SetHoldTime(1000);
 
-
-
-
- // tog denna bara..  Stick.Color1 = Stick.Wheel(random(255));
- //   Stick.Scanner(Stick.Wheel(random(255)), 55);
   Serial.println("go....");
 
      Stick.begin();
@@ -643,12 +760,17 @@ void loop() {
      // stäng av tidigare slingor..
        cops_efx=0; // stäng ner all andra slingor om de nu körs..
 
+
+       // stoppa music om den körs
+       SdPlay.stop();
+      // SdPlay.deInit(); // ska man köra detta...det är om man vill ta ut SD kort...nä....
+
       switch (Key) {
         case '1': doit1(); break; // disco
         case '2': doit2(); break;
-        case '3': doit3(); break;
+        case '3': doit3(); break; // lugn music bara..ingen led..
         case 'A': doitA(); break;  // led strip off
-        case '4': doit4(); break;  // police
+        case '4': doit4(); break;  // police + song NWA
         case '5': doit5(); break;
         case '6': doit6(); break;  // blinka vänster
         case 'B': doitB(); break;  // blinka höger
